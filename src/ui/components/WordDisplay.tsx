@@ -155,7 +155,7 @@ export function WordDisplay() {
 					disabled={!isPlaying || state.currentWord.length === 0}
 					title="Clear"
 				>
-					🗑
+					🗑️
 				</button>
 
 				<button
@@ -179,7 +179,7 @@ export function WordDisplay() {
 					disabled={!canPass}
 					title={state.passIndex < 4 ? "Pass" : "Shoot"}
 				>
-					{state.passIndex < 4 ? "Pass" : "Shoot"}
+					⚽
 				</button>
 
 				<button
