@@ -228,7 +228,7 @@ export function MenuOverlay({ isVisible, canContinue, onNewGame, onContinue }: M
 	return (
 		<div style={styles.overlay}>
 			<div style={styles.title}>Cheepside</div>
-			<div style={styles.subtitle}>A word game about football</div>
+			<div style={styles.subtitle}>A word game about birds and football</div>
 
 			<div style={styles.buttonContainer}>
 				<button style={styles.button} onClick={onNewGame}>
