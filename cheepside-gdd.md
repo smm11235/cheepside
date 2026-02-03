@@ -124,14 +124,18 @@ This creates risk/reward: more points improve shot power but reduce accuracy.
 - Shot resolution with accuracy/power formula
 - 3-possession match structure
 - Ball position visualization on pitch
-- React HUD overlay
+- React HUD overlay with pause button
 - SeedWordList.csv letter generation (pre-curated, no repeats per possession)
 - QU as single tile throughout
+- Menu system (New Game, Continue when paused, How to Play)
+- Action buttons: 🗑️ clear, ⌫ backspace, ⚽ pass/shoot, ↵ submit
+- Auto-clear on invalid/duplicate word submission
 
 **Known Issues:**
 - No visual polish / placeholder graphics
 - No sound
 - Ball rotation animation is instant (no transition)
+- No bird characters yet (despite tagline)
 
 ### In Scope
 1. **Football pitch visualisation (placeholder)**
