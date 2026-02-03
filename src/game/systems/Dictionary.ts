@@ -7,7 +7,7 @@ class DictionarySystem {
 		if (this.loaded) return;
 		if (this.loadPromise) return this.loadPromise;
 
-		this.loadPromise = fetch("/WordList.txt")
+		this.loadPromise = fetch(`${import.meta.env.BASE_URL}WordList.txt`)
 			.then((response) => response.text())
 			.then((text) => {
 				const lines = text.split("\n");
