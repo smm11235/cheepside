@@ -38,6 +38,8 @@ export const colors = {
 		pentagonBorder: "#333333", // Pentagon border
 		hexagon: "#ffffff", // Surrounding hexagons - white
 		hexagonBorder: "#cccccc", // Hexagon border
+		outerPentagon: "#000000", // Outer pentagons (partial) - black
+		outerPentagonBorder: "#333333",
 		outline: "#444466", // Ball outline circle
 	},
 
@@ -145,26 +147,42 @@ export const spacing = {
 // =============================================================================
 
 export const layout = {
-	// Pitch area (top of screen)
+	// HUD bar height (for positioning pitch below it)
+	hudHeight: 50,
+
+	// Pitch area (top of screen, below HUD)
 	pitch: {
-		heightRatio: 0.20, // 20% of screen height (reduced from 30%)
+		heightRatio: 0.15, // 15% of screen height (will be positioned below HUD)
 	},
 
 	// Football interface area
 	ball: {
-		// Relative sizes for the football geometry
-		pentagonRadius: 55, // Base size of center pentagon
-		intermediateRadius: 85, // Radius for hex-hex junction points
-		outerRadius: 105, // Radius for outer hex vertices
-		outerAngleOffset: 18, // Degrees - controls hexagon width at outer edge
+		// Pentagon (center) size
+		pentagonRadius: 50,
+
+		// Perspective effect: hexagons taper toward outer edge
+		// These control the "ring" where hexagons share edges with each other
+		shareRadius: 75, // Radius for vertices shared between hexagons
+		shareAngleOffset: 8, // Degrees offset from pentagon vertex angle
+
+		// Outer edge of hexagons (furthest from center, shortest edge)
+		outerRadius: 95, // Radius for outer hexagon vertices
+		outerAngleOffset: 28, // Degrees - larger = shorter outer edge
+
+		// Ball outline circle
+		outlineRadiusMultiplier: 1.08, // Multiplier of outerRadius for the circle
+
+		// Outer ring of partial pentagons (at corners where hexagons meet)
+		outerPentagonRadius: 105, // Center of outer pentagons
 	},
 
-	// Bottom controls area
+	// Bottom controls area - FIXED HEIGHT
 	controls: {
+		height: 120, // Fixed height for bottom area
 		buttonWidth: "72px",
 		buttonHeight: "48px",
 		buttonGap: "12px",
-		containerPadding: "12px",
+		containerPadding: "8px",
 	},
 
 	// Common border radius values
@@ -216,15 +234,26 @@ export function hexToNumber(hex: string): number {
 
 /**
  * Calculate football vertex positions for the ball interface
- * Returns pentagon vertices and hexagon vertices for all 5 hexagons
+ *
+ * Geometry explanation:
+ * - Central pentagon with 5 vertices
+ * - 5 hexagons surrounding it, each sharing one edge with the pentagon
+ * - Each hexagon has 6 vertices with perspective tapering (outer edge shorter)
+ * - 5 partial pentagons visible at the "corners" where hexagons meet
+ *
+ * Perspective effect:
+ * - Pentagon edge (closest to viewer) = longest
+ * - Edges shared with neighboring hexagons = medium
+ * - Outer edge (furthest from viewer) = shortest
  */
 export function calculateFootballGeometry(scale: number = 1) {
 	const P = layout.ball.pentagonRadius * scale;
-	const P_inter = layout.ball.intermediateRadius * scale;
-	const P_outer = layout.ball.outerRadius * scale;
-	const alpha = (layout.ball.outerAngleOffset * Math.PI) / 180;
+	const R_share = layout.ball.shareRadius * scale;
+	const R_outer = layout.ball.outerRadius * scale;
+	const beta = (layout.ball.shareAngleOffset * Math.PI) / 180;
+	const gamma = (layout.ball.outerAngleOffset * Math.PI) / 180;
 
-	// Pentagon vertices (5 points)
+	// Pentagon vertices (5 points, starting at top)
 	const pentagonVertices: { x: number; y: number }[] = [];
 	for (let i = 0; i < 5; i++) {
 		const theta = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
@@ -234,35 +263,115 @@ export function calculateFootballGeometry(scale: number = 1) {
 		});
 	}
 
-	// Hexagon vertices (6 points each, for 5 hexagons)
+	// Hexagon vertices with perspective tapering
+	// Each hexagon has 6 vertices forming a shape that tapers toward the outer edge
 	const hexagonVertices: { x: number; y: number }[][] = [];
+
 	for (let i = 0; i < 5; i++) {
 		const theta_i = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
 		const theta_next = -Math.PI / 2 + ((i + 1) * 2 * Math.PI) / 5;
+		const theta_hex = (theta_i + theta_next) / 2; // Hexagon center direction
 
-		// 6 vertices going counterclockwise from pentagon vertex i
+		// 6 vertices going around the hexagon:
+		// 1. Pentagon vertex i (Vi)
+		// 2. Shared vertex with hex i-1 (between Vi direction and hex center)
+		// 3. Outer left vertex
+		// 4. Outer right vertex
+		// 5. Shared vertex with hex i+1 (between hex center and V(i+1) direction)
+		// 6. Pentagon vertex i+1 (V(i+1))
+
 		const hex: { x: number; y: number }[] = [
 			// 1. Pentagon vertex i
-			{ x: P * Math.cos(theta_i), y: P * Math.sin(theta_i) },
-			// 2. Intermediate point at angle theta_i (shared with previous hex)
-			{ x: P_inter * Math.cos(theta_i), y: P_inter * Math.sin(theta_i) },
-			// 3. Outer left vertex
+			pentagonVertices[i],
+			// 2. Shared with previous hex - at angle between Vi and hex center
 			{
-				x: P_outer * Math.cos(theta_i + alpha),
-				y: P_outer * Math.sin(theta_i + alpha),
+				x: R_share * Math.cos(theta_i + beta),
+				y: R_share * Math.sin(theta_i + beta),
 			},
-			// 4. Outer right vertex
+			// 3. Outer left - closer to hex center
 			{
-				x: P_outer * Math.cos(theta_next - alpha),
-				y: P_outer * Math.sin(theta_next - alpha),
+				x: R_outer * Math.cos(theta_hex - gamma),
+				y: R_outer * Math.sin(theta_hex - gamma),
 			},
-			// 5. Intermediate point at angle theta_next (shared with next hex)
-			{ x: P_inter * Math.cos(theta_next), y: P_inter * Math.sin(theta_next) },
+			// 4. Outer right - closer to hex center
+			{
+				x: R_outer * Math.cos(theta_hex + gamma),
+				y: R_outer * Math.sin(theta_hex + gamma),
+			},
+			// 5. Shared with next hex - at angle between hex center and V(i+1)
+			{
+				x: R_share * Math.cos(theta_next - beta),
+				y: R_share * Math.sin(theta_next - beta),
+			},
 			// 6. Pentagon vertex i+1
-			{ x: P * Math.cos(theta_next), y: P * Math.sin(theta_next) },
+			pentagonVertices[(i + 1) % 5],
 		];
 		hexagonVertices.push(hex);
 	}
 
-	return { pentagonVertices, hexagonVertices };
+	// Outer partial pentagons (at corners where hexagons meet)
+	// These are the black pentagons visible beyond the white hexagons
+	const R_outerPent = layout.ball.outerPentagonRadius * scale;
+	const outerPentagonVertices: { x: number; y: number }[][] = [];
+
+	for (let i = 0; i < 5; i++) {
+		const theta_i = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+		// The outer pentagon is centered at angle theta_i (same as pentagon vertex)
+		// It's partially visible between two hexagons
+
+		// We only need 3 vertices for the visible portion:
+		// - The shared vertex from hex (i-1) (vertex 5 of hex i-1, which is vertex 2 of hex i)
+		// - The apex of the outer pentagon
+		// - The shared vertex from hex i (vertex 2 of hex i)
+
+		const prevHexIdx = (i + 4) % 5;
+		const outerPent: { x: number; y: number }[] = [
+			// Shared vertex from previous hex (their vertex 5)
+			hexagonVertices[prevHexIdx][4],
+			// Apex of outer pentagon (pointing outward)
+			{
+				x: R_outerPent * Math.cos(theta_i),
+				y: R_outerPent * Math.sin(theta_i),
+			},
+			// Shared vertex from current hex (their vertex 2)
+			hexagonVertices[i][1],
+		];
+		outerPentagonVertices.push(outerPent);
+	}
+
+	// Ball outline radius
+	const outlineRadius = R_outer * layout.ball.outlineRadiusMultiplier;
+
+	return {
+		pentagonVertices,
+		hexagonVertices,
+		outerPentagonVertices,
+		outlineRadius,
+	};
+}
+
+/**
+ * Calculate the visual centroid of a polygon
+ * This is where text should be placed for it to appear centered
+ */
+export function calculatePolygonCentroid(
+	vertices: { x: number; y: number }[]
+): { x: number; y: number } {
+	let cx = 0;
+	let cy = 0;
+	let area = 0;
+
+	for (let i = 0; i < vertices.length; i++) {
+		const j = (i + 1) % vertices.length;
+		const cross = vertices[i].x * vertices[j].y - vertices[j].x * vertices[i].y;
+		area += cross;
+		cx += (vertices[i].x + vertices[j].x) * cross;
+		cy += (vertices[i].y + vertices[j].y) * cross;
+	}
+
+	area /= 2;
+	cx /= 6 * area;
+	cy /= 6 * area;
+
+	return { x: cx, y: cy };
 }

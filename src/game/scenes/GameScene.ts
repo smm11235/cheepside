@@ -6,6 +6,7 @@ import {
 	typography,
 	hexToNumber,
 	calculateFootballGeometry,
+	calculatePolygonCentroid,
 } from "@shared/theme";
 
 interface ButtonData {
@@ -112,27 +113,31 @@ export class GameScene extends Scene {
 		this.ballBg.clear();
 
 		const { width, height } = this.scale;
+		const hudHeight = layout.hudHeight;
 		const pitchHeight = height * layout.pitch.heightRatio;
+		const pitchTop = hudHeight;
 
 		// Redraw pitch
-		this.drawPitch(width, pitchHeight);
+		this.drawPitch(width, pitchHeight, pitchTop);
 
 		// Update ball position
 		const state = gameManager.getState();
 		const positions = [0.3, 0.45, 0.6, 0.75, 0.85];
 		this.ballPositionMarker.setPosition(
 			width * positions[state.passIndex],
-			pitchHeight / 2
+			pitchTop + pitchHeight / 2
 		);
 
 		// Recalculate football interface layout
-		this.updateFootballLayout(width, height, pitchHeight);
+		this.updateFootballLayout(width, height, pitchTop + pitchHeight);
 	}
 
-	private drawPitch(width: number, pitchHeight: number): void {
+	private drawPitch(width: number, pitchHeight: number, pitchTop: number): void {
 		// Background
 		this.pitchGraphics.fillStyle(hexToNumber(colors.surface.pitch), 1);
-		this.pitchGraphics.fillRect(0, 0, width, pitchHeight);
+		this.pitchGraphics.fillRect(0, pitchTop, width, pitchHeight);
+
+		const centerY = pitchTop + pitchHeight / 2;
 
 		// Center line
 		this.pitchGraphics.lineStyle(
@@ -140,25 +145,25 @@ export class GameScene extends Scene {
 			hexToNumber(colors.pitch.lines),
 			colors.pitch.linesOpacity
 		);
-		this.pitchGraphics.moveTo(0, pitchHeight / 2);
-		this.pitchGraphics.lineTo(width, pitchHeight / 2);
+		this.pitchGraphics.moveTo(0, centerY);
+		this.pitchGraphics.lineTo(width, centerY);
 		this.pitchGraphics.strokePath();
 
 		// Center circle
-		this.pitchGraphics.strokeCircle(width / 2, pitchHeight / 2, 30);
+		this.pitchGraphics.strokeCircle(width / 2, centerY, 25);
 
 		// Goals
-		const goalWidth = 60;
-		const goalHeight = 25;
+		const goalWidth = 50;
+		const goalHeight = 20;
 		this.pitchGraphics.strokeRect(
 			0,
-			pitchHeight / 2 - goalHeight,
+			centerY - goalHeight,
 			goalWidth,
 			goalHeight * 2
 		);
 		this.pitchGraphics.strokeRect(
 			width - goalWidth,
-			pitchHeight / 2 - goalHeight,
+			centerY - goalHeight,
 			goalWidth,
 			goalHeight * 2
 		);
@@ -166,16 +171,18 @@ export class GameScene extends Scene {
 
 	private createPitch(): void {
 		const { width, height } = this.scale;
+		const hudHeight = layout.hudHeight;
 		const pitchHeight = height * layout.pitch.heightRatio;
+		const pitchTop = hudHeight;
 
 		this.pitchGraphics = this.add.graphics();
-		this.drawPitch(width, pitchHeight);
+		this.drawPitch(width, pitchHeight, pitchTop);
 
 		// Ball position marker
 		this.ballPositionMarker = this.add.circle(
 			width * 0.3,
-			pitchHeight / 2,
-			8,
+			pitchTop + pitchHeight / 2,
+			6,
 			hexToNumber(colors.pitch.ball)
 		);
 		this.ballPositionMarker.setStrokeStyle(
@@ -186,12 +193,14 @@ export class GameScene extends Scene {
 
 	private createBallInterface(): void {
 		const { width, height } = this.scale;
+		const hudHeight = layout.hudHeight;
 		const pitchHeight = height * layout.pitch.heightRatio;
+		const pitchBottom = hudHeight + pitchHeight;
 
 		this.ballBg = this.add.graphics();
 
 		// Calculate layout and draw
-		this.updateFootballLayout(width, height, pitchHeight);
+		this.updateFootballLayout(width, height, pitchBottom);
 
 		this.updateLetterDisplay();
 	}
@@ -199,7 +208,7 @@ export class GameScene extends Scene {
 	private updateFootballLayout(
 		width: number,
 		height: number,
-		pitchHeight: number
+		pitchBottom: number
 	): void {
 		// Clear existing buttons
 		this.buttons = [];
@@ -208,18 +217,15 @@ export class GameScene extends Scene {
 		this.letterButtons = [];
 
 		// Calculate available space for football
-		const interfaceHeight = height - pitchHeight;
-		// Account for bottom controls area (approximately 140px for word display + buttons)
-		const controlsHeight = 140;
-		const availableHeight = interfaceHeight - controlsHeight;
+		const controlsHeight = layout.controls.height;
+		const availableHeight = height - pitchBottom - controlsHeight;
 
 		// Center the football in the available space
 		this.footballCenterX = width / 2;
-		this.footballCenterY = pitchHeight + availableHeight / 2;
+		this.footballCenterY = pitchBottom + availableHeight / 2;
 
 		// Calculate scale based on available space
-		// The outer radius of the football should fit within the available area
-		const maxRadius = Math.min(width * 0.45, availableHeight * 0.45);
+		const maxRadius = Math.min(width * 0.42, availableHeight * 0.45);
 		this.footballScale = maxRadius / layout.ball.outerRadius;
 
 		// Calculate geometry at this scale
@@ -228,15 +234,17 @@ export class GameScene extends Scene {
 		// Draw background
 		this.ballBg.clear();
 		this.ballBg.fillStyle(hexToNumber(colors.surface.background), 1);
-		this.ballBg.fillRect(0, pitchHeight, width, interfaceHeight);
+		this.ballBg.fillRect(0, pitchBottom, width, height - pitchBottom);
+
+		// Draw outer pentagons (partial, clipped by circle)
+		this.drawOuterPentagons();
 
 		// Draw decorative ball outline
-		const ballRadius = layout.ball.outerRadius * this.footballScale * 1.15;
 		this.ballBg.lineStyle(3, hexToNumber(colors.football.outline), 1);
 		this.ballBg.strokeCircle(
 			this.footballCenterX,
 			this.footballCenterY,
-			ballRadius
+			this.footballGeometry.outlineRadius
 		);
 
 		// Create center pentagon
@@ -268,6 +276,137 @@ export class GameScene extends Scene {
 		}
 	}
 
+	private drawOuterPentagons(): void {
+		// Draw the 5 partial pentagons at the corners where hexagons meet
+		// These are clipped by the ball outline circle
+
+		const outlineRadius = this.footballGeometry.outlineRadius;
+
+		for (let i = 0; i < 5; i++) {
+			const vertices = this.footballGeometry.outerPentagonVertices[i];
+
+			// Create a path for the triangle (visible portion of outer pentagon)
+			this.ballBg.fillStyle(hexToNumber(colors.football.outerPentagon), 1);
+			this.ballBg.lineStyle(
+				2,
+				hexToNumber(colors.football.outerPentagonBorder),
+				1
+			);
+
+			// We need to clip this triangle to the ball outline
+			// For simplicity, we'll draw it and rely on the outline being drawn on top
+			// But we should check if vertices are inside the circle
+
+			const clippedVertices = this.clipPolygonToCircle(
+				vertices.map((v) => ({
+					x: v.x + this.footballCenterX,
+					y: v.y + this.footballCenterY,
+				})),
+				this.footballCenterX,
+				this.footballCenterY,
+				outlineRadius
+			);
+
+			if (clippedVertices.length >= 3) {
+				this.ballBg.beginPath();
+				this.ballBg.moveTo(clippedVertices[0].x, clippedVertices[0].y);
+				for (let j = 1; j < clippedVertices.length; j++) {
+					this.ballBg.lineTo(clippedVertices[j].x, clippedVertices[j].y);
+				}
+				this.ballBg.closePath();
+				this.ballBg.fillPath();
+				this.ballBg.strokePath();
+			}
+		}
+	}
+
+	private clipPolygonToCircle(
+		polygon: { x: number; y: number }[],
+		cx: number,
+		cy: number,
+		radius: number
+	): { x: number; y: number }[] {
+		// Sutherland-Hodgman style clipping against a circle
+		// This is a simplified version that works for convex polygons
+
+		const result: { x: number; y: number }[] = [];
+
+		for (let i = 0; i < polygon.length; i++) {
+			const current = polygon[i];
+			const next = polygon[(i + 1) % polygon.length];
+
+			const currentInside = this.isInsideCircle(current, cx, cy, radius);
+			const nextInside = this.isInsideCircle(next, cx, cy, radius);
+
+			if (currentInside) {
+				result.push(current);
+			}
+
+			if (currentInside !== nextInside) {
+				// Find intersection with circle
+				const intersection = this.lineCircleIntersection(
+					current,
+					next,
+					cx,
+					cy,
+					radius
+				);
+				if (intersection) {
+					result.push(intersection);
+				}
+			}
+		}
+
+		return result;
+	}
+
+	private isInsideCircle(
+		point: { x: number; y: number },
+		cx: number,
+		cy: number,
+		radius: number
+	): boolean {
+		const dx = point.x - cx;
+		const dy = point.y - cy;
+		return dx * dx + dy * dy <= radius * radius;
+	}
+
+	private lineCircleIntersection(
+		p1: { x: number; y: number },
+		p2: { x: number; y: number },
+		cx: number,
+		cy: number,
+		radius: number
+	): { x: number; y: number } | null {
+		const dx = p2.x - p1.x;
+		const dy = p2.y - p1.y;
+		const fx = p1.x - cx;
+		const fy = p1.y - cy;
+
+		const a = dx * dx + dy * dy;
+		const b = 2 * (fx * dx + fy * dy);
+		const c = fx * fx + fy * fy - radius * radius;
+
+		const discriminant = b * b - 4 * a * c;
+		if (discriminant < 0) return null;
+
+		const sqrtDisc = Math.sqrt(discriminant);
+		let t = (-b - sqrtDisc) / (2 * a);
+
+		if (t < 0 || t > 1) {
+			t = (-b + sqrtDisc) / (2 * a);
+		}
+
+		if (t >= 0 && t <= 1) {
+			return {
+				x: p1.x + t * dx,
+				y: p1.y + t * dy,
+			};
+		}
+
+		return null;
+	}
+
 	private createPentagonButton(): GameObjects.Container {
 		const container = this.add.container(
 			this.footballCenterX,
@@ -289,9 +428,9 @@ export class GameScene extends Scene {
 		graphics.fillPath();
 		graphics.strokePath();
 
-		// Text label
+		// Text label at centroid (which is 0,0 for the pentagon)
 		const text = this.add.text(0, 0, "", {
-			fontSize: `${Math.round(32 * this.footballScale)}px`,
+			fontSize: `${Math.round(28 * this.footballScale)}px`,
 			fontFamily: typography.fontFamily.primary,
 			color: colors.text.onPentagon,
 			fontStyle: "bold",
@@ -305,37 +444,35 @@ export class GameScene extends Scene {
 	}
 
 	private createHexagonButton(index: number): GameObjects.Container {
-		// Calculate hexagon center position for the container
 		const hexVertices = this.footballGeometry.hexagonVertices[index];
-		const centerX =
-			hexVertices.reduce((sum, v) => sum + v.x, 0) / hexVertices.length;
-		const centerY =
-			hexVertices.reduce((sum, v) => sum + v.y, 0) / hexVertices.length;
+
+		// Calculate the proper centroid of the hexagon for text positioning
+		const centroid = calculatePolygonCentroid(hexVertices);
 
 		const container = this.add.container(
-			this.footballCenterX + centerX,
-			this.footballCenterY + centerY
+			this.footballCenterX + centroid.x,
+			this.footballCenterY + centroid.y
 		);
 		const graphics = this.add.graphics();
 
-		// Draw hexagon using calculated vertices (offset by container center)
+		// Draw hexagon using calculated vertices (offset by centroid)
 		graphics.fillStyle(hexToNumber(colors.football.hexagon), 1);
 		graphics.lineStyle(2, hexToNumber(colors.football.hexagonBorder), 1);
 		graphics.beginPath();
-		graphics.moveTo(hexVertices[0].x - centerX, hexVertices[0].y - centerY);
+		graphics.moveTo(hexVertices[0].x - centroid.x, hexVertices[0].y - centroid.y);
 		for (let i = 1; i < hexVertices.length; i++) {
-			graphics.lineTo(hexVertices[i].x - centerX, hexVertices[i].y - centerY);
+			graphics.lineTo(
+				hexVertices[i].x - centroid.x,
+				hexVertices[i].y - centroid.y
+			);
 		}
 		graphics.closePath();
 		graphics.fillPath();
 		graphics.strokePath();
 
-		// Text label - position at visual center of the hexagon
-		// The visual center is slightly toward the pentagon edge
-		const textOffsetX = -centerX * 0.15;
-		const textOffsetY = -centerY * 0.15;
-		const text = this.add.text(textOffsetX, textOffsetY, "", {
-			fontSize: `${Math.round(28 * this.footballScale)}px`,
+		// Text label at origin (which is the centroid)
+		const text = this.add.text(0, 0, "", {
+			fontSize: `${Math.round(24 * this.footballScale)}px`,
 			fontFamily: typography.fontFamily.primary,
 			color: colors.text.onHexagon,
 			fontStyle: "bold",
@@ -481,6 +618,7 @@ export class GameScene extends Scene {
 
 	private updateBallPosition(passIndex: number): void {
 		const { width, height } = this.scale;
+		const hudHeight = layout.hudHeight;
 		const pitchHeight = height * layout.pitch.heightRatio;
 
 		const positions = [0.3, 0.45, 0.6, 0.75, 0.85];
@@ -489,7 +627,7 @@ export class GameScene extends Scene {
 		this.tweens.add({
 			targets: this.ballPositionMarker,
 			x: targetX,
-			y: pitchHeight / 2,
+			y: hudHeight + pitchHeight / 2,
 			duration: 300,
 			ease: "Power2",
 		});
@@ -501,16 +639,22 @@ export class GameScene extends Scene {
 
 	private showGoalCelebration(): void {
 		const { width, height } = this.scale;
+		const hudHeight = layout.hudHeight;
 		const pitchHeight = height * layout.pitch.heightRatio;
 
-		const goalText = this.add.text(width / 2, pitchHeight / 2, "GOAL!", {
-			fontSize: typography.fontSize["4xl"],
-			fontFamily: typography.fontFamily.primary,
-			color: colors.accent,
-			fontStyle: "bold",
-			stroke: "#000000",
-			strokeThickness: 4,
-		});
+		const goalText = this.add.text(
+			width / 2,
+			hudHeight + pitchHeight / 2,
+			"GOAL!",
+			{
+				fontSize: typography.fontSize["4xl"],
+				fontFamily: typography.fontFamily.primary,
+				color: colors.accent,
+				fontStyle: "bold",
+				stroke: "#000000",
+				strokeThickness: 4,
+			}
+		);
 		goalText.setOrigin(0.5);
 
 		this.tweens.add({
@@ -526,16 +670,22 @@ export class GameScene extends Scene {
 
 	private showMissEffect(): void {
 		const { width, height } = this.scale;
+		const hudHeight = layout.hudHeight;
 		const pitchHeight = height * layout.pitch.heightRatio;
 
-		const missText = this.add.text(width / 2, pitchHeight / 2, "SAVED!", {
-			fontSize: "36px",
-			fontFamily: typography.fontFamily.primary,
-			color: colors.state.error,
-			fontStyle: "bold",
-			stroke: "#000000",
-			strokeThickness: 3,
-		});
+		const missText = this.add.text(
+			width / 2,
+			hudHeight + pitchHeight / 2,
+			"SAVED!",
+			{
+				fontSize: "36px",
+				fontFamily: typography.fontFamily.primary,
+				color: colors.state.error,
+				fontStyle: "bold",
+				stroke: "#000000",
+				strokeThickness: 3,
+			}
+		);
 		missText.setOrigin(0.5);
 
 		this.tweens.add({
