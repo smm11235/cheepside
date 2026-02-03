@@ -75,6 +75,11 @@ const styles: Record<string, React.CSSProperties> = {
 		background: "#fbbf24",
 		color: "#000",
 	},
+	passButtonDisabled: {
+		background: "#4a4530",
+		color: "#666",
+		cursor: "not-allowed",
+	},
 	deleteButton: {
 		background: "#ef4444",
 		color: "#fff",
@@ -109,6 +114,7 @@ export function WordDisplay() {
 			setFeedback({ message: `+${result.score} points${bonusText}`, isError: false });
 		} else {
 			setFeedback({ message: result.reason || "Invalid", isError: true });
+			gameManager.clearWord();
 		}
 	};
 
@@ -147,8 +153,9 @@ export function WordDisplay() {
 					}}
 					onClick={handleClear}
 					disabled={!isPlaying || state.currentWord.length === 0}
+					title="Clear"
 				>
-					Clear
+					🗑
 				</button>
 
 				<button
@@ -158,8 +165,21 @@ export function WordDisplay() {
 					}}
 					onClick={handleDelete}
 					disabled={!isPlaying || state.currentWord.length === 0}
+					title="Backspace"
 				>
 					⌫
+				</button>
+
+				<button
+					style={{
+						...styles.button,
+						...(canPass ? styles.passButton : styles.passButtonDisabled),
+					}}
+					onClick={handlePass}
+					disabled={!canPass}
+					title={state.passIndex < 4 ? "Pass" : "Shoot"}
+				>
+					{state.passIndex < 4 ? "Pass" : "Shoot"}
 				</button>
 
 				<button
@@ -169,21 +189,10 @@ export function WordDisplay() {
 					}}
 					onClick={handleSubmit}
 					disabled={!canSubmit}
+					title="Submit"
 				>
-					Submit
+					↵
 				</button>
-
-				{canPass && (
-					<button
-						style={{
-							...styles.button,
-							...styles.passButton,
-						}}
-						onClick={handlePass}
-					>
-						{state.passIndex < 4 ? "Pass!" : "Shoot!"}
-					</button>
-				)}
 			</div>
 		</div>
 	);
