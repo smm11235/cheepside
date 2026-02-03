@@ -48,15 +48,20 @@ const styles: Record<string, React.CSSProperties> = {
 		gap: "12px",
 	},
 	button: {
-		padding: "12px 24px",
-		fontSize: "16px",
+		width: "72px",
+		height: "48px",
+		padding: "0",
+		fontSize: "20px",
 		fontWeight: "bold",
 		fontFamily: "Arial, sans-serif",
 		border: "none",
 		borderRadius: "8px",
 		cursor: "pointer",
-		transition: "transform 0.1s, opacity 0.1s",
+		transition: "transform 0.1s, opacity 0.1s, background 0.2s",
 		pointerEvents: "auto",
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
 	},
 	submitButton: {
 		background: "#4ade80",
@@ -68,22 +73,25 @@ const styles: Record<string, React.CSSProperties> = {
 		cursor: "not-allowed",
 	},
 	clearButton: {
-		background: "#64748b",
+		background: "#000",
 		color: "#fff",
 	},
 	passButton: {
 		background: "#fbbf24",
 		color: "#000",
 	},
+	passButtonShoot: {
+		background: "#22c55e",
+		color: "#000",
+	},
 	passButtonDisabled: {
-		background: "#4a4530",
+		background: "#333",
 		color: "#666",
 		cursor: "not-allowed",
 	},
 	deleteButton: {
 		background: "#ef4444",
 		color: "#fff",
-		padding: "12px 16px",
 	},
 };
 
@@ -173,7 +181,11 @@ export function WordDisplay() {
 				<button
 					style={{
 						...styles.button,
-						...(canPass ? styles.passButton : styles.passButtonDisabled),
+						...(canPass
+							? state.passIndex === 4
+								? styles.passButtonShoot
+								: styles.passButton
+							: styles.passButtonDisabled),
 					}}
 					onClick={handlePass}
 					disabled={!canPass}
