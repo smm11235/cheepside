@@ -1,5 +1,6 @@
 import { useGameState } from "@ui/hooks/useGameState";
 import { PASS_THRESHOLDS } from "@shared/types";
+import { colors, typography, spacing, layout } from "@shared/theme";
 
 const styles: Record<string, React.CSSProperties> = {
 	container: {
@@ -7,30 +8,30 @@ const styles: Record<string, React.CSSProperties> = {
 		top: 0,
 		left: 0,
 		right: 0,
-		padding: "8px 12px",
+		padding: `${spacing.sm} ${spacing.md}`,
 		display: "flex",
 		justifyContent: "space-between",
 		alignItems: "center",
-		background: "rgba(0, 0, 0, 0.6)",
-		color: "#fff",
-		fontFamily: "Arial, sans-serif",
-		fontSize: "14px",
-		zIndex: 100,
+		background: colors.surface.hudBackground,
+		color: colors.text.primary,
+		fontFamily: typography.fontFamily.primary,
+		fontSize: typography.fontSize.sm,
+		zIndex: layout.zIndex.hud,
 		pointerEvents: "none",
 	},
 	pauseButton: {
 		background: "transparent",
 		border: "none",
-		color: "#fff",
-		fontSize: "24px",
+		color: colors.text.primary,
+		fontSize: typography.fontSize.xl,
 		cursor: "pointer",
-		padding: "4px 8px",
+		padding: `${spacing.xs} ${spacing.sm}`,
 		pointerEvents: "auto",
 	},
 	section: {
 		display: "flex",
 		alignItems: "center",
-		gap: "16px",
+		gap: spacing.lg,
 	},
 	stat: {
 		display: "flex",
@@ -38,43 +39,43 @@ const styles: Record<string, React.CSSProperties> = {
 		alignItems: "center",
 	},
 	label: {
-		fontSize: "10px",
-		color: "#aaa",
+		fontSize: typography.fontSize.xs,
+		color: colors.text.secondary,
 		textTransform: "uppercase",
 	},
 	value: {
 		fontSize: "18px",
-		fontWeight: "bold",
+		fontWeight: typography.fontWeight.bold,
 	},
 	goals: {
-		fontSize: "24px",
-		fontWeight: "bold",
-		color: "#ffd700",
+		fontSize: typography.fontSize.xl,
+		fontWeight: typography.fontWeight.bold,
+		color: colors.accent,
 	},
 	timer: {
-		fontSize: "20px",
-		fontWeight: "bold",
+		fontSize: typography.fontSize.lg,
+		fontWeight: typography.fontWeight.bold,
 	},
 	timerLow: {
-		color: "#ff6b6b",
+		color: colors.state.error,
 	},
 	progress: {
 		display: "flex",
-		gap: "4px",
+		gap: spacing.xs,
 		alignItems: "center",
 	},
 	progressDot: {
 		width: "8px",
 		height: "8px",
 		borderRadius: "50%",
-		background: "#444",
+		background: colors.progress.inactive,
 	},
 	progressDotActive: {
-		background: "#4ade80",
+		background: colors.progress.active,
 	},
 	progressDotCurrent: {
-		background: "#fbbf24",
-		boxShadow: "0 0 6px #fbbf24",
+		background: colors.progress.current,
+		boxShadow: `0 0 6px ${colors.progress.current}`,
 	},
 };
 
@@ -123,7 +124,7 @@ export function HUD({ onPause }: HUDProps) {
 				</div>
 			</div>
 
-			<div style={{ ...styles.section, gap: "8px" }}>
+			<div style={{ ...styles.section, gap: spacing.sm }}>
 				<div style={styles.stat}>
 					<span style={styles.label}>Time</span>
 					<span

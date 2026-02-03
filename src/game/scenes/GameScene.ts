@@ -1,11 +1,16 @@
 import { Scene, GameObjects } from "phaser";
 import { gameManager } from "../systems/GameManager";
+import {
+	colors,
+	layout,
+	typography,
+	hexToNumber,
+	calculateFootballGeometry,
+} from "@shared/theme";
 
 interface ButtonData {
-	x: number;
-	y: number;
-	radius: number;
-	index: number; // -1 for center, 0-4 for surrounding
+	polygon: { x: number; y: number }[];
+	index: number; // -1 for center pentagon, 0-4 for surrounding hexagons
 	container: GameObjects.Container;
 }
 
@@ -18,6 +23,12 @@ export class GameScene extends Scene {
 	private pitchGraphics!: GameObjects.Graphics;
 	private ballPositionMarker!: GameObjects.Arc;
 	private ballBg!: GameObjects.Graphics;
+
+	// Football geometry cache
+	private footballGeometry!: ReturnType<typeof calculateFootballGeometry>;
+	private footballScale = 1;
+	private footballCenterX = 0;
+	private footballCenterY = 0;
 
 	// Event unsubscribe
 	private unsubscribe: (() => void) | null = null;
@@ -51,15 +62,33 @@ export class GameScene extends Scene {
 	}
 
 	private findButtonAtPosition(x: number, y: number): ButtonData | null {
+		// Check if point is inside any button polygon
 		for (const button of this.buttons) {
-			const dx = x - button.x;
-			const dy = y - button.y;
-			const distance = Math.sqrt(dx * dx + dy * dy);
-			if (distance <= button.radius) {
+			if (this.isPointInPolygon(x, y, button.polygon)) {
 				return button;
 			}
 		}
 		return null;
+	}
+
+	private isPointInPolygon(
+		x: number,
+		y: number,
+		polygon: { x: number; y: number }[]
+	): boolean {
+		// Ray casting algorithm for point-in-polygon test
+		let inside = false;
+		for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+			const xi = polygon[i].x,
+				yi = polygon[i].y;
+			const xj = polygon[j].x,
+				yj = polygon[j].y;
+
+			if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+				inside = !inside;
+			}
+		}
+		return inside;
 	}
 
 	private handleButtonClick(button: ButtonData): void {
@@ -83,134 +112,232 @@ export class GameScene extends Scene {
 		this.ballBg.clear();
 
 		const { width, height } = this.scale;
-		const pitchHeight = height * 0.3;
+		const pitchHeight = height * layout.pitch.heightRatio;
 
-		this.pitchGraphics.fillStyle(0x2d8a3e, 1);
+		// Redraw pitch
+		this.drawPitch(width, pitchHeight);
+
+		// Update ball position
+		const state = gameManager.getState();
+		const positions = [0.3, 0.45, 0.6, 0.75, 0.85];
+		this.ballPositionMarker.setPosition(
+			width * positions[state.passIndex],
+			pitchHeight / 2
+		);
+
+		// Recalculate football interface layout
+		this.updateFootballLayout(width, height, pitchHeight);
+	}
+
+	private drawPitch(width: number, pitchHeight: number): void {
+		// Background
+		this.pitchGraphics.fillStyle(hexToNumber(colors.surface.pitch), 1);
 		this.pitchGraphics.fillRect(0, 0, width, pitchHeight);
-		this.pitchGraphics.lineStyle(2, 0xffffff, 0.8);
+
+		// Center line
+		this.pitchGraphics.lineStyle(
+			2,
+			hexToNumber(colors.pitch.lines),
+			colors.pitch.linesOpacity
+		);
 		this.pitchGraphics.moveTo(0, pitchHeight / 2);
 		this.pitchGraphics.lineTo(width, pitchHeight / 2);
 		this.pitchGraphics.strokePath();
+
+		// Center circle
 		this.pitchGraphics.strokeCircle(width / 2, pitchHeight / 2, 30);
 
+		// Goals
 		const goalWidth = 60;
 		const goalHeight = 25;
-		this.pitchGraphics.strokeRect(0, pitchHeight / 2 - goalHeight, goalWidth, goalHeight * 2);
-		this.pitchGraphics.strokeRect(width - goalWidth, pitchHeight / 2 - goalHeight, goalWidth, goalHeight * 2);
-
-		const state = gameManager.getState();
-		const positions = [0.3, 0.45, 0.6, 0.75, 0.85];
-		this.ballPositionMarker.setPosition(width * positions[state.passIndex], pitchHeight / 2);
-
-		const interfaceHeight = height - pitchHeight;
-		const centerY = pitchHeight + interfaceHeight * 0.4;
-		const centerX = width / 2;
-
-		this.ballBg.fillStyle(0x1a1a2e, 1);
-		this.ballBg.fillRect(0, pitchHeight, width, interfaceHeight);
-
-		const ballRadius = Math.min(width, interfaceHeight) * 0.38;
-		this.ballBg.lineStyle(3, 0x444466, 1);
-		this.ballBg.strokeCircle(centerX, centerY, ballRadius);
-
-		// Update button positions
-		const centerSize = 55;
-		this.centerButton.setPosition(centerX, centerY);
-		this.buttons[0] = { x: centerX, y: centerY, radius: centerSize, index: -1, container: this.centerButton };
-
-		const hexRadius = ballRadius * 0.55;
-		const hexSize = 48;
-		for (let i = 0; i < 5; i++) {
-			const angle = (i * 72 - 90) * (Math.PI / 180);
-			const x = centerX + Math.cos(angle) * hexRadius;
-			const y = centerY + Math.sin(angle) * hexRadius;
-			this.letterButtons[i].setPosition(x, y);
-			this.buttons[i + 1] = { x, y, radius: hexSize, index: i, container: this.letterButtons[i] };
-		}
+		this.pitchGraphics.strokeRect(
+			0,
+			pitchHeight / 2 - goalHeight,
+			goalWidth,
+			goalHeight * 2
+		);
+		this.pitchGraphics.strokeRect(
+			width - goalWidth,
+			pitchHeight / 2 - goalHeight,
+			goalWidth,
+			goalHeight * 2
+		);
 	}
 
 	private createPitch(): void {
 		const { width, height } = this.scale;
-		const pitchHeight = height * 0.3;
+		const pitchHeight = height * layout.pitch.heightRatio;
 
 		this.pitchGraphics = this.add.graphics();
+		this.drawPitch(width, pitchHeight);
 
-		this.pitchGraphics.fillStyle(0x2d8a3e, 1);
-		this.pitchGraphics.fillRect(0, 0, width, pitchHeight);
-		this.pitchGraphics.lineStyle(2, 0xffffff, 0.8);
-		this.pitchGraphics.moveTo(0, pitchHeight / 2);
-		this.pitchGraphics.lineTo(width, pitchHeight / 2);
-		this.pitchGraphics.strokePath();
-		this.pitchGraphics.strokeCircle(width / 2, pitchHeight / 2, 30);
-
-		const goalWidth = 60;
-		const goalHeight = 25;
-		this.pitchGraphics.strokeRect(0, pitchHeight / 2 - goalHeight, goalWidth, goalHeight * 2);
-		this.pitchGraphics.strokeRect(width - goalWidth, pitchHeight / 2 - goalHeight, goalWidth, goalHeight * 2);
-
-		this.ballPositionMarker = this.add.circle(width * 0.3, pitchHeight / 2, 8, 0xffffff);
-		this.ballPositionMarker.setStrokeStyle(2, 0x000000);
+		// Ball position marker
+		this.ballPositionMarker = this.add.circle(
+			width * 0.3,
+			pitchHeight / 2,
+			8,
+			hexToNumber(colors.pitch.ball)
+		);
+		this.ballPositionMarker.setStrokeStyle(
+			2,
+			hexToNumber(colors.pitch.ballBorder)
+		);
 	}
 
 	private createBallInterface(): void {
 		const { width, height } = this.scale;
-		const pitchHeight = height * 0.3;
-		const interfaceHeight = height - pitchHeight;
-		const centerY = pitchHeight + interfaceHeight * 0.4;
-		const centerX = width / 2;
+		const pitchHeight = height * layout.pitch.heightRatio;
 
 		this.ballBg = this.add.graphics();
-		this.ballBg.fillStyle(0x1a1a2e, 1);
-		this.ballBg.fillRect(0, pitchHeight, width, interfaceHeight);
 
-		const ballRadius = Math.min(width, interfaceHeight) * 0.38;
-		this.ballBg.lineStyle(3, 0x444466, 1);
-		this.ballBg.strokeCircle(centerX, centerY, ballRadius);
-
-		// Create center pentagon
-		const centerSize = 55;
-		this.centerButton = this.createLetterButton(centerX, centerY, true);
-		this.buttons.push({ x: centerX, y: centerY, radius: centerSize, index: -1, container: this.centerButton });
-
-		// Create surrounding hexagons
-		const hexRadius = ballRadius * 0.55;
-		const hexSize = 48;
-		for (let i = 0; i < 5; i++) {
-			const angle = (i * 72 - 90) * (Math.PI / 180);
-			const x = centerX + Math.cos(angle) * hexRadius;
-			const y = centerY + Math.sin(angle) * hexRadius;
-
-			const button = this.createLetterButton(x, y, false);
-			this.letterButtons.push(button);
-			this.buttons.push({ x, y, radius: hexSize, index: i, container: button });
-		}
+		// Calculate layout and draw
+		this.updateFootballLayout(width, height, pitchHeight);
 
 		this.updateLetterDisplay();
 	}
 
-	private createLetterButton(x: number, y: number, isCenter: boolean): GameObjects.Container {
-		const container = this.add.container(x, y);
-		const size = isCenter ? 55 : 48;
-		const sides = isCenter ? 5 : 6;
+	private updateFootballLayout(
+		width: number,
+		height: number,
+		pitchHeight: number
+	): void {
+		// Clear existing buttons
+		this.buttons = [];
+		this.centerButton?.destroy();
+		this.letterButtons.forEach((b) => b.destroy());
+		this.letterButtons = [];
 
+		// Calculate available space for football
+		const interfaceHeight = height - pitchHeight;
+		// Account for bottom controls area (approximately 140px for word display + buttons)
+		const controlsHeight = 140;
+		const availableHeight = interfaceHeight - controlsHeight;
+
+		// Center the football in the available space
+		this.footballCenterX = width / 2;
+		this.footballCenterY = pitchHeight + availableHeight / 2;
+
+		// Calculate scale based on available space
+		// The outer radius of the football should fit within the available area
+		const maxRadius = Math.min(width * 0.45, availableHeight * 0.45);
+		this.footballScale = maxRadius / layout.ball.outerRadius;
+
+		// Calculate geometry at this scale
+		this.footballGeometry = calculateFootballGeometry(this.footballScale);
+
+		// Draw background
+		this.ballBg.clear();
+		this.ballBg.fillStyle(hexToNumber(colors.surface.background), 1);
+		this.ballBg.fillRect(0, pitchHeight, width, interfaceHeight);
+
+		// Draw decorative ball outline
+		const ballRadius = layout.ball.outerRadius * this.footballScale * 1.15;
+		this.ballBg.lineStyle(3, hexToNumber(colors.football.outline), 1);
+		this.ballBg.strokeCircle(
+			this.footballCenterX,
+			this.footballCenterY,
+			ballRadius
+		);
+
+		// Create center pentagon
+		this.centerButton = this.createPentagonButton();
+		const pentagonPolygon = this.footballGeometry.pentagonVertices.map((v) => ({
+			x: v.x + this.footballCenterX,
+			y: v.y + this.footballCenterY,
+		}));
+		this.buttons.push({
+			polygon: pentagonPolygon,
+			index: -1,
+			container: this.centerButton,
+		});
+
+		// Create surrounding hexagons
+		for (let i = 0; i < 5; i++) {
+			const button = this.createHexagonButton(i);
+			this.letterButtons.push(button);
+
+			const hexPolygon = this.footballGeometry.hexagonVertices[i].map((v) => ({
+				x: v.x + this.footballCenterX,
+				y: v.y + this.footballCenterY,
+			}));
+			this.buttons.push({
+				polygon: hexPolygon,
+				index: i,
+				container: button,
+			});
+		}
+	}
+
+	private createPentagonButton(): GameObjects.Container {
+		const container = this.add.container(
+			this.footballCenterX,
+			this.footballCenterY
+		);
 		const graphics = this.add.graphics();
-		const points = this.getPolygonPoints(0, 0, size, sides);
 
-		graphics.fillStyle(isCenter ? 0x3a3a5a : 0x2a2a4a, 1);
-		graphics.lineStyle(2, isCenter ? 0x6a6a9a : 0x5a5a8a, 1);
+		// Draw pentagon using calculated vertices
+		const vertices = this.footballGeometry.pentagonVertices;
+
+		graphics.fillStyle(hexToNumber(colors.football.pentagon), 1);
+		graphics.lineStyle(2, hexToNumber(colors.football.pentagonBorder), 1);
 		graphics.beginPath();
-		graphics.moveTo(points[0].x, points[0].y);
-		for (let i = 1; i < points.length; i++) {
-			graphics.lineTo(points[i].x, points[i].y);
+		graphics.moveTo(vertices[0].x, vertices[0].y);
+		for (let i = 1; i < vertices.length; i++) {
+			graphics.lineTo(vertices[i].x, vertices[i].y);
 		}
 		graphics.closePath();
 		graphics.fillPath();
 		graphics.strokePath();
 
+		// Text label
 		const text = this.add.text(0, 0, "", {
-			fontSize: isCenter ? "32px" : "28px",
-			fontFamily: "Arial, sans-serif",
-			color: "#ffffff",
+			fontSize: `${Math.round(32 * this.footballScale)}px`,
+			fontFamily: typography.fontFamily.primary,
+			color: colors.text.onPentagon,
+			fontStyle: "bold",
+		});
+		text.setOrigin(0.5);
+
+		container.add([graphics, text]);
+		container.setData("text", text);
+
+		return container;
+	}
+
+	private createHexagonButton(index: number): GameObjects.Container {
+		// Calculate hexagon center position for the container
+		const hexVertices = this.footballGeometry.hexagonVertices[index];
+		const centerX =
+			hexVertices.reduce((sum, v) => sum + v.x, 0) / hexVertices.length;
+		const centerY =
+			hexVertices.reduce((sum, v) => sum + v.y, 0) / hexVertices.length;
+
+		const container = this.add.container(
+			this.footballCenterX + centerX,
+			this.footballCenterY + centerY
+		);
+		const graphics = this.add.graphics();
+
+		// Draw hexagon using calculated vertices (offset by container center)
+		graphics.fillStyle(hexToNumber(colors.football.hexagon), 1);
+		graphics.lineStyle(2, hexToNumber(colors.football.hexagonBorder), 1);
+		graphics.beginPath();
+		graphics.moveTo(hexVertices[0].x - centerX, hexVertices[0].y - centerY);
+		for (let i = 1; i < hexVertices.length; i++) {
+			graphics.lineTo(hexVertices[i].x - centerX, hexVertices[i].y - centerY);
+		}
+		graphics.closePath();
+		graphics.fillPath();
+		graphics.strokePath();
+
+		// Text label - position at visual center of the hexagon
+		// The visual center is slightly toward the pentagon edge
+		const textOffsetX = -centerX * 0.15;
+		const textOffsetY = -centerY * 0.15;
+		const text = this.add.text(textOffsetX, textOffsetY, "", {
+			fontSize: `${Math.round(28 * this.footballScale)}px`,
+			fontFamily: typography.fontFamily.primary,
+			color: colors.text.onHexagon,
 			fontStyle: "bold",
 		});
 		text.setOrigin(0.5);
@@ -293,36 +420,22 @@ export class GameScene extends Scene {
 		}
 	}
 
-	private getPolygonPoints(
-		cx: number,
-		cy: number,
-		radius: number,
-		sides: number
-	): { x: number; y: number }[] {
-		const points: { x: number; y: number }[] = [];
-		const angleOffset = -Math.PI / 2;
-
-		for (let i = 0; i < sides; i++) {
-			const angle = angleOffset + (i * 2 * Math.PI) / sides;
-			points.push({
-				x: cx + radius * Math.cos(angle),
-				y: cy + radius * Math.sin(angle),
-			});
-		}
-
-		return points;
-	}
-
 	private updateLetterDisplay(): void {
 		const state = gameManager.getState();
 
-		const centerText = this.centerButton.getData("text") as GameObjects.Text;
-		centerText.setText(state.centerLetter.toUpperCase());
+		const centerText = this.centerButton?.getData("text") as GameObjects.Text;
+		if (centerText) {
+			centerText.setText(state.centerLetter.toUpperCase());
+		}
 
 		state.surroundingLetters.forEach((letter, i) => {
 			const button = this.letterButtons[i];
-			const text = button.getData("text") as GameObjects.Text;
-			text.setText(letter.toUpperCase());
+			if (button) {
+				const text = button.getData("text") as GameObjects.Text;
+				if (text) {
+					text.setText(letter.toUpperCase());
+				}
+			}
 		});
 	}
 
@@ -368,7 +481,7 @@ export class GameScene extends Scene {
 
 	private updateBallPosition(passIndex: number): void {
 		const { width, height } = this.scale;
-		const pitchHeight = height * 0.3;
+		const pitchHeight = height * layout.pitch.heightRatio;
 
 		const positions = [0.3, 0.45, 0.6, 0.75, 0.85];
 		const targetX = width * positions[passIndex];
@@ -388,12 +501,12 @@ export class GameScene extends Scene {
 
 	private showGoalCelebration(): void {
 		const { width, height } = this.scale;
-		const pitchHeight = height * 0.3;
+		const pitchHeight = height * layout.pitch.heightRatio;
 
 		const goalText = this.add.text(width / 2, pitchHeight / 2, "GOAL!", {
-			fontSize: "48px",
-			fontFamily: "Arial, sans-serif",
-			color: "#ffff00",
+			fontSize: typography.fontSize["4xl"],
+			fontFamily: typography.fontFamily.primary,
+			color: colors.accent,
 			fontStyle: "bold",
 			stroke: "#000000",
 			strokeThickness: 4,
@@ -413,12 +526,12 @@ export class GameScene extends Scene {
 
 	private showMissEffect(): void {
 		const { width, height } = this.scale;
-		const pitchHeight = height * 0.3;
+		const pitchHeight = height * layout.pitch.heightRatio;
 
 		const missText = this.add.text(width / 2, pitchHeight / 2, "SAVED!", {
 			fontSize: "36px",
-			fontFamily: "Arial, sans-serif",
-			color: "#ff6666",
+			fontFamily: typography.fontFamily.primary,
+			color: colors.state.error,
 			fontStyle: "bold",
 			stroke: "#000000",
 			strokeThickness: 3,

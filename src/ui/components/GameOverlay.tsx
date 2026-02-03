@@ -1,5 +1,6 @@
 import { useGameState } from "@ui/hooks/useGameState";
 import { gameManager } from "@game/systems/GameManager";
+import { colors, typography, spacing, layout } from "@shared/theme";
 
 const styles: Record<string, React.CSSProperties> = {
 	overlay: {
@@ -13,51 +14,51 @@ const styles: Record<string, React.CSSProperties> = {
 		alignItems: "center",
 		justifyContent: "center",
 		background: "rgba(0, 0, 0, 0.85)",
-		zIndex: 200,
+		zIndex: layout.zIndex.overlay,
 	},
 	title: {
 		fontSize: "36px",
-		fontWeight: "bold",
-		fontFamily: "Arial, sans-serif",
-		color: "#fff",
-		marginBottom: "16px",
+		fontWeight: typography.fontWeight.bold,
+		fontFamily: typography.fontFamily.primary,
+		color: colors.text.primary,
+		marginBottom: spacing.lg,
 	},
 	goals: {
 		fontSize: "72px",
-		fontWeight: "bold",
-		fontFamily: "Arial, sans-serif",
-		color: "#ffd700",
-		marginBottom: "8px",
+		fontWeight: typography.fontWeight.bold,
+		fontFamily: typography.fontFamily.primary,
+		color: colors.accent,
+		marginBottom: spacing.sm,
 	},
 	goalsLabel: {
-		fontSize: "24px",
-		fontFamily: "Arial, sans-serif",
-		color: "#aaa",
-		marginBottom: "32px",
+		fontSize: typography.fontSize.xl,
+		fontFamily: typography.fontFamily.primary,
+		color: colors.text.secondary,
+		marginBottom: spacing["2xl"],
 	},
 	button: {
-		padding: "16px 48px",
-		fontSize: "20px",
-		fontWeight: "bold",
-		fontFamily: "Arial, sans-serif",
-		background: "#4ade80",
-		color: "#000",
+		padding: `${spacing.lg} ${spacing["3xl"]}`,
+		fontSize: typography.fontSize.lg,
+		fontWeight: typography.fontWeight.bold,
+		fontFamily: typography.fontFamily.primary,
+		background: colors.primary,
+		color: colors.text.onPrimary,
 		border: "none",
-		borderRadius: "12px",
+		borderRadius: layout.borderRadius.lg,
 		cursor: "pointer",
 	},
 	phaseText: {
-		fontSize: "48px",
-		fontWeight: "bold",
-		fontFamily: "Arial, sans-serif",
-		color: "#fff",
+		fontSize: typography.fontSize["4xl"],
+		fontWeight: typography.fontWeight.bold,
+		fontFamily: typography.fontFamily.primary,
+		color: colors.text.primary,
 		textAlign: "center",
 	},
 	subText: {
-		fontSize: "20px",
-		fontFamily: "Arial, sans-serif",
-		color: "#aaa",
-		marginTop: "12px",
+		fontSize: typography.fontSize.lg,
+		fontFamily: typography.fontFamily.primary,
+		color: colors.text.secondary,
+		marginTop: spacing.md,
 	},
 };
 
@@ -106,7 +107,7 @@ export function GameOverlay() {
 	if (state.phase === "goal") {
 		return (
 			<div style={styles.overlay}>
-				<div style={{ ...styles.phaseText, color: "#ffd700" }}>GOAL!</div>
+				<div style={{ ...styles.phaseText, color: colors.accent }}>GOAL!</div>
 			</div>
 		);
 	}
@@ -114,7 +115,7 @@ export function GameOverlay() {
 	if (state.phase === "miss") {
 		return (
 			<div style={styles.overlay}>
-				<div style={{ ...styles.phaseText, color: "#f87171" }}>Saved!</div>
+				<div style={{ ...styles.phaseText, color: colors.state.error }}>Saved!</div>
 			</div>
 		);
 	}

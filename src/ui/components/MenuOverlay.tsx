@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { colors, typography, spacing, layout } from "@shared/theme";
 
 const styles: Record<string, React.CSSProperties> = {
 	overlay: {
@@ -11,59 +12,59 @@ const styles: Record<string, React.CSSProperties> = {
 		flexDirection: "column",
 		alignItems: "center",
 		justifyContent: "center",
-		background: "rgba(0, 0, 0, 0.95)",
-		zIndex: 300,
+		background: colors.surface.overlayDark,
+		zIndex: layout.zIndex.menu,
 	},
 	title: {
-		fontSize: "48px",
-		fontWeight: "bold",
-		fontFamily: "Arial, sans-serif",
-		color: "#fff",
-		marginBottom: "8px",
+		fontSize: typography.fontSize["4xl"],
+		fontWeight: typography.fontWeight.bold,
+		fontFamily: typography.fontFamily.primary,
+		color: colors.text.primary,
+		marginBottom: spacing.sm,
 	},
 	subtitle: {
-		fontSize: "16px",
-		fontFamily: "Arial, sans-serif",
-		color: "#888",
-		marginBottom: "48px",
+		fontSize: typography.fontSize.base,
+		fontFamily: typography.fontFamily.primary,
+		color: colors.text.secondary,
+		marginBottom: spacing["3xl"],
 	},
 	buttonContainer: {
 		display: "flex",
 		flexDirection: "column",
-		gap: "16px",
-		marginBottom: "32px",
+		gap: spacing.lg,
+		marginBottom: spacing["2xl"],
 	},
 	button: {
-		padding: "16px 48px",
-		fontSize: "20px",
-		fontWeight: "bold",
-		fontFamily: "Arial, sans-serif",
-		background: "#4ade80",
-		color: "#000",
+		padding: `${spacing.lg} ${spacing["3xl"]}`,
+		fontSize: typography.fontSize.lg,
+		fontWeight: typography.fontWeight.bold,
+		fontFamily: typography.fontFamily.primary,
+		background: colors.primary,
+		color: colors.text.onPrimary,
 		border: "none",
-		borderRadius: "12px",
+		borderRadius: layout.borderRadius.lg,
 		cursor: "pointer",
 		minWidth: "200px",
-		boxShadow: "0 4px 12px rgba(74, 222, 128, 0.3)",
+		boxShadow: `0 4px 12px rgba(74, 222, 128, 0.3)`,
 	},
 	buttonDisabled: {
-		background: "#333",
-		color: "#666",
+		background: colors.state.disabled,
+		color: colors.state.disabledText,
 		cursor: "not-allowed",
 		boxShadow: "none",
 	},
 	secondaryButton: {
 		background: "#64748b",
-		color: "#fff",
+		color: colors.text.primary,
 		boxShadow: "0 4px 12px rgba(100, 116, 139, 0.3)",
 	},
 	howToPlayButton: {
 		background: "transparent",
-		color: "#888",
-		border: "1px solid #444",
+		color: colors.text.secondary,
+		border: `1px solid ${colors.state.disabled}`,
 		boxShadow: "none",
-		fontSize: "16px",
-		padding: "12px 32px",
+		fontSize: typography.fontSize.base,
+		padding: `${spacing.md} ${spacing["2xl"]}`,
 	},
 	// How to Play modal
 	modal: {
@@ -74,68 +75,68 @@ const styles: Record<string, React.CSSProperties> = {
 		width: "90%",
 		maxWidth: "360px",
 		maxHeight: "80%",
-		background: "#1a1a2e",
-		borderRadius: "16px",
+		background: colors.surface.card,
+		borderRadius: layout.borderRadius.xl,
 		overflow: "hidden",
 		display: "flex",
 		flexDirection: "column",
 		boxShadow: "0 8px 32px rgba(0, 0, 0, 0.5)",
 	},
 	modalHeader: {
-		padding: "16px 20px",
-		borderBottom: "1px solid #333",
+		padding: `${spacing.lg} ${spacing.xl}`,
+		borderBottom: `1px solid ${colors.state.disabled}`,
 		display: "flex",
 		justifyContent: "space-between",
 		alignItems: "center",
 	},
 	modalTitle: {
-		fontSize: "20px",
-		fontWeight: "bold",
-		fontFamily: "Arial, sans-serif",
-		color: "#fff",
+		fontSize: typography.fontSize.lg,
+		fontWeight: typography.fontWeight.bold,
+		fontFamily: typography.fontFamily.primary,
+		color: colors.text.primary,
 		margin: 0,
 	},
 	closeButton: {
 		background: "transparent",
 		border: "none",
-		color: "#888",
-		fontSize: "24px",
+		color: colors.text.secondary,
+		fontSize: typography.fontSize.xl,
 		cursor: "pointer",
-		padding: "4px 8px",
+		padding: `${spacing.xs} ${spacing.sm}`,
 	},
 	modalContent: {
-		padding: "20px",
+		padding: spacing.xl,
 		overflowY: "auto",
 		flex: 1,
 	},
 	section: {
-		marginBottom: "20px",
+		marginBottom: spacing.xl,
 	},
 	sectionTitle: {
-		fontSize: "14px",
-		fontWeight: "bold",
-		fontFamily: "Arial, sans-serif",
-		color: "#4ade80",
+		fontSize: typography.fontSize.sm,
+		fontWeight: typography.fontWeight.bold,
+		fontFamily: typography.fontFamily.primary,
+		color: colors.primary,
 		textTransform: "uppercase",
-		marginBottom: "8px",
+		marginBottom: spacing.sm,
 	},
 	text: {
-		fontSize: "14px",
-		fontFamily: "Arial, sans-serif",
+		fontSize: typography.fontSize.sm,
+		fontFamily: typography.fontFamily.primary,
 		color: "#ccc",
-		lineHeight: 1.5,
+		lineHeight: typography.lineHeight.normal,
 		margin: 0,
 	},
 	listItem: {
-		fontSize: "14px",
-		fontFamily: "Arial, sans-serif",
+		fontSize: typography.fontSize.sm,
+		fontFamily: typography.fontFamily.primary,
 		color: "#ccc",
-		lineHeight: 1.6,
-		marginBottom: "4px",
+		lineHeight: typography.lineHeight.relaxed,
+		marginBottom: spacing.xs,
 	},
 	highlight: {
-		color: "#fbbf24",
-		fontWeight: "bold",
+		color: colors.text.highlight,
+		fontWeight: typography.fontWeight.bold,
 	},
 };
 
@@ -182,7 +183,7 @@ export function MenuOverlay({ isVisible, canContinue, onNewGame, onContinue }: M
 							<p style={styles.text}>
 								Reach point thresholds to unlock the ⚽ button:
 							</p>
-							<div style={{ marginTop: "8px" }}>
+							<div style={{ marginTop: spacing.sm }}>
 								<div style={styles.listItem}>• Pass 1: 5 pts</div>
 								<div style={styles.listItem}>• Pass 2: 20 pts</div>
 								<div style={styles.listItem}>• Pass 3: 40 pts</div>
@@ -201,7 +202,7 @@ export function MenuOverlay({ isVisible, canContinue, onNewGame, onContinue }: M
 
 						<div style={styles.section}>
 							<div style={styles.sectionTitle}>Controls</div>
-							<div style={{ marginTop: "8px" }}>
+							<div style={{ marginTop: spacing.sm }}>
 								<div style={styles.listItem}>🗑️ Clear word</div>
 								<div style={styles.listItem}>⌫ Delete last letter</div>
 								<div style={styles.listItem}>⚽ Pass or Shoot</div>
@@ -211,7 +212,7 @@ export function MenuOverlay({ isVisible, canContinue, onNewGame, onContinue }: M
 
 						<div style={styles.section}>
 							<div style={styles.sectionTitle}>Keyboard Shortcuts</div>
-							<div style={{ marginTop: "8px" }}>
+							<div style={{ marginTop: spacing.sm }}>
 								<div style={styles.listItem}>A-Z: Type letters</div>
 								<div style={styles.listItem}>Enter: Submit word</div>
 								<div style={styles.listItem}>Backspace: Delete</div>
