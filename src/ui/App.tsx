@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
 import { Game } from "phaser";
 import { gameConfig } from "@game/config";
+import { HUD } from "./components/HUD";
+import { WordDisplay } from "./components/WordDisplay";
+import { GameOverlay } from "./components/GameOverlay";
 
 export function App() {
 	const gameRef = useRef<Game | null>(null);
@@ -17,8 +20,10 @@ export function App() {
 	}, []);
 
 	return (
-		<div id="game-container" style={{ width: "100%", height: "100%" }}>
-			{/* React UI overlays will go here */}
+		<div id="game-container" style={{ width: "100%", height: "100%", position: "relative" }}>
+			<HUD />
+			<WordDisplay />
+			<GameOverlay />
 		</div>
 	);
 }

@@ -1,5 +1,6 @@
 import { Types } from "phaser";
 import { BootScene } from "./scenes/BootScene";
+import { GameScene } from "./scenes/GameScene";
 
 export const gameConfig: Types.Core.GameConfig = {
 	type: Phaser.AUTO,
@@ -10,5 +11,5 @@ export const gameConfig: Types.Core.GameConfig = {
 		width: "100%",
 		height: "100%",
 	},
-	scene: [BootScene],
+	scene: [BootScene, GameScene],
 };
