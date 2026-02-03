@@ -9,7 +9,6 @@ class GameManager {
 	private state: GameState;
 	private listeners: GameEventCallback[] = [];
 	private timerInterval: number | null = null;
-	private thresholdBonusGiven = false;
 	private roundSets: LetterSet[] = []; // Pre-generated letter sets for current possession
 
 	constructor() {
@@ -56,7 +55,6 @@ class GameManager {
 
 	startMatch(): void {
 		this.state = this.createInitialState();
-		this.thresholdBonusGiven = false;
 
 		// Pre-generate all 5 letter sets for this possession
 		this.roundSets = letterGenerator.generateRoundSets();
@@ -161,9 +159,6 @@ class GameManager {
 
 		this.emit("wordSubmitted", { word, score, totalPoints: this.state.currentPoints, hasBonus });
 
-		// Check if threshold reached (and give time bonus)
-		this.checkThreshold();
-
 		return { success: true, score, hasBonus };
 	}
 
@@ -172,24 +167,6 @@ class GameManager {
 			return word.includes("QU");
 		}
 		return word.includes(tile);
-	}
-
-	private checkThreshold(): void {
-		const threshold = PASS_THRESHOLDS[this.state.passIndex];
-		if (this.state.currentPoints >= threshold && !this.thresholdBonusGiven) {
-			this.thresholdBonusGiven = true;
-			this.state.timeRemaining = Math.min(
-				this.state.timeRemaining + TIME_CONFIG.bonusPerPass,
-				TIME_CONFIG.maxTime
-			);
-
-			this.emit("thresholdReached", {
-				passIndex: this.state.passIndex,
-				threshold,
-				points: this.state.currentPoints,
-				timeBonus: TIME_CONFIG.bonusPerPass,
-			});
-		}
 	}
 
 	canPass(): boolean {
@@ -203,14 +180,19 @@ class GameManager {
 
 		if (this.state.passIndex < 4) {
 			this.state.passIndex++;
-			this.thresholdBonusGiven = false;
 			this.state.submittedWords = [];
 			this.state.currentWord = "";
+
+			// Award time bonus on pass
+			this.state.timeRemaining = Math.min(
+				this.state.timeRemaining + TIME_CONFIG.bonusPerPass,
+				TIME_CONFIG.maxTime
+			);
 
 			// Use pre-generated letter set for this pass
 			this.applyLetterSet(this.state.passIndex);
 
-			this.emit("passCompleted", { passIndex: this.state.passIndex });
+			this.emit("passCompleted", { passIndex: this.state.passIndex, timeBonus: TIME_CONFIG.bonusPerPass });
 		} else {
 			this.executeShot();
 		}
@@ -260,7 +242,6 @@ class GameManager {
 		this.state.timeRemaining = TIME_CONFIG.startingTime;
 		this.state.submittedWords = [];
 		this.state.currentWord = "";
-		this.thresholdBonusGiven = false;
 
 		// Generate new round sets for this possession
 		this.roundSets = letterGenerator.generateRoundSets();
