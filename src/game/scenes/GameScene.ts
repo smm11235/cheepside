@@ -222,19 +222,28 @@ export class GameScene extends Scene {
 	}
 
 	private setupKeyboardInput(): void {
-		const getAvailableLetters = (): Set<string> => {
+		const getAvailableTiles = (): Set<string> => {
 			const state = gameManager.getState();
-			const letters = new Set<string>();
-			letters.add(state.centerLetter.toUpperCase());
-			state.surroundingLetters.forEach((l) => letters.add(l.toUpperCase()));
-			return letters;
+			const tiles = new Set<string>();
+			tiles.add(state.centerLetter.toUpperCase());
+			state.surroundingLetters.forEach((l) => tiles.add(l.toUpperCase()));
+			return tiles;
 		};
 
 		this.input.keyboard?.on("keydown", (event: KeyboardEvent) => {
 			const key = event.key.toUpperCase();
 
 			if (key.length === 1 && key >= "A" && key <= "Z") {
-				const available = getAvailableLetters();
+				const available = getAvailableTiles();
+
+				// Handle Q key specially - if we have QU tile, add QU
+				if (key === "Q" && available.has("QU")) {
+					gameManager.addLetter("QU");
+					this.flashKeyPress("QU");
+					return;
+				}
+
+				// For other letters, check if available
 				if (available.has(key)) {
 					gameManager.addLetter(key);
 					this.flashKeyPress(key);
@@ -267,16 +276,17 @@ export class GameScene extends Scene {
 		});
 	}
 
-	private flashKeyPress(letter: string): void {
+	private flashKeyPress(tile: string): void {
 		const state = gameManager.getState();
+		const upperTile = tile.toUpperCase();
 
-		if (state.centerLetter.toUpperCase() === letter) {
+		if (state.centerLetter.toUpperCase() === upperTile) {
 			this.animateButtonPress(this.centerButton);
 			return;
 		}
 
 		const index = state.surroundingLetters.findIndex(
-			(l) => l.toUpperCase() === letter
+			(l) => l.toUpperCase() === upperTile
 		);
 		if (index >= 0) {
 			this.animateButtonPress(this.letterButtons[index]);

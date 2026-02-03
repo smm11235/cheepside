@@ -1,7 +1,7 @@
 import { GameState, PASS_THRESHOLDS, TIME_CONFIG } from "@shared/types";
 import { dictionary } from "./Dictionary";
-import { generateLetterSet } from "./LetterGenerator";
-import { getWordScore, isWordValid, calculateShotSuccess } from "./Scoring";
+import { letterGenerator, LetterSet } from "./LetterGenerator";
+import { getWordScore, isWordValidWithTiles, calculateShotSuccess } from "./Scoring";
 
 type GameEventCallback = (state: GameState, event: string, data?: unknown) => void;
 
@@ -9,14 +9,14 @@ class GameManager {
 	private state: GameState;
 	private listeners: GameEventCallback[] = [];
 	private timerInterval: number | null = null;
-	private thresholdBonusGiven = false; // Track if we've given time bonus for current threshold
+	private thresholdBonusGiven = false;
+	private roundSets: LetterSet[] = []; // Pre-generated letter sets for current possession
 
 	constructor() {
 		this.state = this.createInitialState();
 	}
 
 	private createInitialState(): GameState {
-		const letters = generateLetterSet();
 		return {
 			possession: 1,
 			goals: 0,
@@ -24,11 +24,11 @@ class GameManager {
 			currentPoints: 0,
 			passIndex: 0,
 			timeRemaining: TIME_CONFIG.startingTime,
-			usedPentagons: [letters.center],
+			usedPentagons: [],
 			currentWord: "",
 			submittedWords: [],
-			centerLetter: letters.center,
-			surroundingLetters: letters.surrounding,
+			centerLetter: "",
+			surroundingLetters: [],
 		};
 	}
 
@@ -50,15 +50,28 @@ class GameManager {
 	}
 
 	async initialize(): Promise<void> {
-		await dictionary.load();
+		await Promise.all([dictionary.load(), letterGenerator.load()]);
 		this.emit("initialized");
 	}
 
 	startMatch(): void {
 		this.state = this.createInitialState();
 		this.thresholdBonusGiven = false;
+
+		// Pre-generate all 5 letter sets for this possession
+		this.roundSets = letterGenerator.generateRoundSets();
+		this.applyLetterSet(0);
+
 		this.startTimer();
 		this.emit("matchStart");
+	}
+
+	private applyLetterSet(index: number): void {
+		const set = this.roundSets[index];
+		if (set) {
+			this.state.centerLetter = set.center;
+			this.state.surroundingLetters = set.surrounding;
+		}
 	}
 
 	private startTimer(): void {
@@ -93,7 +106,12 @@ class GameManager {
 	removeLetter(): void {
 		if (this.state.phase !== "playing") return;
 		if (this.state.currentWord.length > 0) {
-			this.state.currentWord = this.state.currentWord.slice(0, -1);
+			// Handle QU as single unit when deleting
+			if (this.state.currentWord.endsWith("QU")) {
+				this.state.currentWord = this.state.currentWord.slice(0, -2);
+			} else {
+				this.state.currentWord = this.state.currentWord.slice(0, -1);
+			}
 			this.emit("letterRemoved");
 		}
 	}
@@ -121,8 +139,11 @@ class GameManager {
 			return { success: false, reason: "Already used" };
 		}
 
-		// Check if uses valid letters (center letter no longer required)
-		if (!isWordValid(word, this.state.centerLetter, this.state.surroundingLetters, this.state.centerLetter)) {
+		// Get all available tiles (center + surrounding)
+		const allTiles = [this.state.centerLetter, ...this.state.surroundingLetters];
+
+		// Check if word can be formed with available tiles
+		if (!isWordValidWithTiles(word, allTiles)) {
 			return { success: false, reason: "Invalid letters" };
 		}
 
@@ -133,7 +154,7 @@ class GameManager {
 
 		// Valid word! Score with bonus for center letter
 		const score = getWordScore(word, this.state.centerLetter);
-		const hasBonus = word.includes(this.state.centerLetter.toUpperCase());
+		const hasBonus = this.wordContainsTile(word, this.state.centerLetter);
 		this.state.currentPoints += score;
 		this.state.submittedWords.push(word);
 		this.state.currentWord = "";
@@ -146,10 +167,16 @@ class GameManager {
 		return { success: true, score, hasBonus };
 	}
 
+	private wordContainsTile(word: string, tile: string): boolean {
+		if (tile === "QU") {
+			return word.includes("QU");
+		}
+		return word.includes(tile);
+	}
+
 	private checkThreshold(): void {
 		const threshold = PASS_THRESHOLDS[this.state.passIndex];
 		if (this.state.currentPoints >= threshold && !this.thresholdBonusGiven) {
-			// Give time bonus immediately when threshold is reached
 			this.thresholdBonusGiven = true;
 			this.state.timeRemaining = Math.min(
 				this.state.timeRemaining + TIME_CONFIG.bonusPerPass,
@@ -175,21 +202,16 @@ class GameManager {
 		if (!this.canPass()) return;
 
 		if (this.state.passIndex < 4) {
-			// Regular pass - time bonus already given when threshold reached
 			this.state.passIndex++;
-			this.thresholdBonusGiven = false; // Reset for next threshold
+			this.thresholdBonusGiven = false;
 			this.state.submittedWords = [];
 			this.state.currentWord = "";
 
-			// Generate new letters, excluding used pentagons
-			const newLetters = generateLetterSet(this.state.usedPentagons);
-			this.state.centerLetter = newLetters.center;
-			this.state.surroundingLetters = newLetters.surrounding;
-			this.state.usedPentagons.push(newLetters.center);
+			// Use pre-generated letter set for this pass
+			this.applyLetterSet(this.state.passIndex);
 
 			this.emit("passCompleted", { passIndex: this.state.passIndex });
 		} else {
-			// Shot!
 			this.executeShot();
 		}
 	}
@@ -213,7 +235,6 @@ class GameManager {
 				this.emit("shotMissed");
 			}
 
-			// Continue to next possession or end match
 			setTimeout(() => this.nextPossession(), 2000);
 		}, 1500);
 	}
@@ -241,11 +262,9 @@ class GameManager {
 		this.state.currentWord = "";
 		this.thresholdBonusGiven = false;
 
-		// Full reshuffle for new possession
-		const newLetters = generateLetterSet();
-		this.state.centerLetter = newLetters.center;
-		this.state.surroundingLetters = newLetters.surrounding;
-		this.state.usedPentagons = [newLetters.center];
+		// Generate new round sets for this possession
+		this.roundSets = letterGenerator.generateRoundSets();
+		this.applyLetterSet(0);
 
 		this.startTimer();
 		this.emit("possessionStart", { possession: this.state.possession });
