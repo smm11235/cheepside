@@ -62,6 +62,7 @@ const styles: Record<string, React.CSSProperties> = {
 		display: "flex",
 		alignItems: "center",
 		justifyContent: "center",
+		boxShadow: "0 2px 8px rgba(200, 200, 200, 0.3)",
 	},
 	submitButton: {
 		background: "#4ade80",

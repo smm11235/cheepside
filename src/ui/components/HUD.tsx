@@ -18,6 +18,15 @@ const styles: Record<string, React.CSSProperties> = {
 		zIndex: 100,
 		pointerEvents: "none",
 	},
+	pauseButton: {
+		background: "transparent",
+		border: "none",
+		color: "#fff",
+		fontSize: "24px",
+		cursor: "pointer",
+		padding: "4px 8px",
+		pointerEvents: "auto",
+	},
 	section: {
 		display: "flex",
 		alignItems: "center",
@@ -69,7 +78,11 @@ const styles: Record<string, React.CSSProperties> = {
 	},
 };
 
-export function HUD() {
+interface HUDProps {
+	onPause: () => void;
+}
+
+export function HUD({ onPause }: HUDProps) {
 	const state = useGameState();
 	const threshold = PASS_THRESHOLDS[state.passIndex];
 	const isTimerLow = state.timeRemaining <= 5;
@@ -110,16 +123,21 @@ export function HUD() {
 				</div>
 			</div>
 
-			<div style={styles.stat}>
-				<span style={styles.label}>Time</span>
-				<span
-					style={{
-						...styles.timer,
-						...(isTimerLow ? styles.timerLow : {}),
-					}}
-				>
-					{Math.max(0, state.timeRemaining).toFixed(1)}s
-				</span>
+			<div style={{ ...styles.section, gap: "8px" }}>
+				<div style={styles.stat}>
+					<span style={styles.label}>Time</span>
+					<span
+						style={{
+							...styles.timer,
+							...(isTimerLow ? styles.timerLow : {}),
+						}}
+					>
+						{Math.max(0, state.timeRemaining).toFixed(1)}s
+					</span>
+				</div>
+				<button style={styles.pauseButton} onClick={onPause} title="Pause">
+					⏸
+				</button>
 			</div>
 		</div>
 	);

@@ -10,6 +10,7 @@ class GameManager {
 	private listeners: GameEventCallback[] = [];
 	private timerInterval: number | null = null;
 	private roundSets: LetterSet[] = []; // Pre-generated letter sets for current possession
+	private paused = false;
 
 	constructor() {
 		this.state = this.createInitialState();
@@ -77,7 +78,7 @@ class GameManager {
 			clearInterval(this.timerInterval);
 		}
 		this.timerInterval = window.setInterval(() => {
-			if (this.state.phase !== "playing") return;
+			if (this.state.phase !== "playing" || this.paused) return;
 
 			this.state.timeRemaining -= 0.1;
 			this.emit("tick");
@@ -259,7 +260,22 @@ class GameManager {
 
 	restartMatch(): void {
 		this.stopTimer();
+		this.paused = false;
 		this.startMatch();
+	}
+
+	pause(): void {
+		this.paused = true;
+		this.emit("paused");
+	}
+
+	unpause(): void {
+		this.paused = false;
+		this.emit("unpaused");
+	}
+
+	isPaused(): boolean {
+		return this.paused;
 	}
 
 	destroy(): void {
