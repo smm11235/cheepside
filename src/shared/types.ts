@@ -41,7 +41,7 @@ export const FIBONACCI_SCORES: Record<number, number> = {
 };
 
 export const TIME_CONFIG = {
-	startingTime: 20,
+	startingTime: 30,
 	bonusPerPass: 20,
 	maxTime: 100,
 } as const;

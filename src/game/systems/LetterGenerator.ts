@@ -21,6 +21,8 @@ export interface LetterSet {
 }
 
 export function generateLetterSet(excludeCenters: string[] = []): LetterSet {
+	const usedLetters = new Set<string>();
+
 	// Center letter: always a common consonant (better for word formation)
 	const availableForCenter = COMMON_CONSONANTS.filter(
 		(c) => !excludeCenters.includes(c)
@@ -29,50 +31,41 @@ export function generateLetterSet(excludeCenters: string[] = []): LetterSet {
 		? pickRandom(availableForCenter)
 		: pickRandom(COMMON_CONSONANTS);
 
-	// Surrounding 5 letters:
+	usedLetters.add(center);
+
+	// Surrounding 5 letters - all unique, no duplicates
 	// - Always 2 vowels (guaranteed)
 	// - 1-2 common consonants
 	// - Rest random
 	const surrounding: string[] = [];
 
-	// Add exactly 2 vowels (guaranteed)
-	const usedVowels: string[] = [];
-	for (let i = 0; i < 2; i++) {
-		let vowel = pickRandom(VOWELS);
-		// Try to get different vowels
-		let attempts = 0;
-		while (usedVowels.includes(vowel) && attempts < 5) {
-			vowel = pickRandom(VOWELS);
-			attempts++;
-		}
-		usedVowels.push(vowel);
+	// Add exactly 2 unique vowels
+	const availableVowels = VOWELS.filter((v) => !usedLetters.has(v));
+	for (let i = 0; i < 2 && availableVowels.length > 0; i++) {
+		const idx = Math.floor(Math.random() * availableVowels.length);
+		const vowel = availableVowels.splice(idx, 1)[0];
 		surrounding.push(vowel);
+		usedLetters.add(vowel);
 	}
 
-	// Add 1-2 common consonants (not the center letter)
+	// Add 1-2 common consonants (not already used)
 	const commonCount = Math.random() < 0.5 ? 1 : 2;
-	const availableCommon = COMMON_CONSONANTS.filter((c) => c !== center);
-	const usedCommon: string[] = [];
-	for (let i = 0; i < commonCount; i++) {
-		let consonant = pickRandom(availableCommon);
-		let attempts = 0;
-		while (usedCommon.includes(consonant) && attempts < 5) {
-			consonant = pickRandom(availableCommon);
-			attempts++;
-		}
-		usedCommon.push(consonant);
+	const availableCommon = COMMON_CONSONANTS.filter((c) => !usedLetters.has(c));
+	for (let i = 0; i < commonCount && availableCommon.length > 0; i++) {
+		const idx = Math.floor(Math.random() * availableCommon.length);
+		const consonant = availableCommon.splice(idx, 1)[0];
 		surrounding.push(consonant);
+		usedLetters.add(consonant);
 	}
 
-	// Fill remaining slots with random letters
+	// Fill remaining slots with unique random letters
 	const allLetters = [...VOWELS, ...COMMON_CONSONANTS, ...OTHER_CONSONANTS];
-	while (surrounding.length < 5) {
-		const letter = pickRandom(allLetters);
-		// Avoid too many duplicates and avoid center letter
-		const count = surrounding.filter((l) => l === letter).length;
-		if (letter !== center && count < 2) {
-			surrounding.push(letter);
-		}
+	const availableAll = allLetters.filter((l) => !usedLetters.has(l));
+	while (surrounding.length < 5 && availableAll.length > 0) {
+		const idx = Math.floor(Math.random() * availableAll.length);
+		const letter = availableAll.splice(idx, 1)[0];
+		surrounding.push(letter);
+		usedLetters.add(letter);
 	}
 
 	return { center, surrounding: shuffle(surrounding) };

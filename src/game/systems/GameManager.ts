@@ -9,6 +9,7 @@ class GameManager {
 	private state: GameState;
 	private listeners: GameEventCallback[] = [];
 	private timerInterval: number | null = null;
+	private thresholdBonusGiven = false; // Track if we've given time bonus for current threshold
 
 	constructor() {
 		this.state = this.createInitialState();
@@ -55,6 +56,7 @@ class GameManager {
 
 	startMatch(): void {
 		this.state = this.createInitialState();
+		this.thresholdBonusGiven = false;
 		this.startTimer();
 		this.emit("matchStart");
 	}
@@ -102,7 +104,7 @@ class GameManager {
 		this.emit("wordCleared");
 	}
 
-	submitWord(): { success: boolean; reason?: string; score?: number } {
+	submitWord(): { success: boolean; reason?: string; score?: number; hasBonus?: boolean } {
 		if (this.state.phase !== "playing") {
 			return { success: false, reason: "Not in playing phase" };
 		}
@@ -119,8 +121,8 @@ class GameManager {
 			return { success: false, reason: "Already used" };
 		}
 
-		// Check if uses valid letters
-		if (!isWordValid(word, this.state.centerLetter, this.state.surroundingLetters)) {
+		// Check if uses valid letters (center letter no longer required)
+		if (!isWordValid(word, this.state.centerLetter, this.state.surroundingLetters, this.state.centerLetter)) {
 			return { success: false, reason: "Invalid letters" };
 		}
 
@@ -129,27 +131,36 @@ class GameManager {
 			return { success: false, reason: "Not in dictionary" };
 		}
 
-		// Valid word!
-		const score = getWordScore(word);
+		// Valid word! Score with bonus for center letter
+		const score = getWordScore(word, this.state.centerLetter);
+		const hasBonus = word.includes(this.state.centerLetter.toUpperCase());
 		this.state.currentPoints += score;
 		this.state.submittedWords.push(word);
 		this.state.currentWord = "";
 
-		this.emit("wordSubmitted", { word, score, totalPoints: this.state.currentPoints });
+		this.emit("wordSubmitted", { word, score, totalPoints: this.state.currentPoints, hasBonus });
 
-		// Check if threshold reached
+		// Check if threshold reached (and give time bonus)
 		this.checkThreshold();
 
-		return { success: true, score };
+		return { success: true, score, hasBonus };
 	}
 
 	private checkThreshold(): void {
 		const threshold = PASS_THRESHOLDS[this.state.passIndex];
-		if (this.state.currentPoints >= threshold) {
+		if (this.state.currentPoints >= threshold && !this.thresholdBonusGiven) {
+			// Give time bonus immediately when threshold is reached
+			this.thresholdBonusGiven = true;
+			this.state.timeRemaining = Math.min(
+				this.state.timeRemaining + TIME_CONFIG.bonusPerPass,
+				TIME_CONFIG.maxTime
+			);
+
 			this.emit("thresholdReached", {
 				passIndex: this.state.passIndex,
 				threshold,
 				points: this.state.currentPoints,
+				timeBonus: TIME_CONFIG.bonusPerPass,
 			});
 		}
 	}
@@ -164,12 +175,9 @@ class GameManager {
 		if (!this.canPass()) return;
 
 		if (this.state.passIndex < 4) {
-			// Regular pass
+			// Regular pass - time bonus already given when threshold reached
 			this.state.passIndex++;
-			this.state.timeRemaining = Math.min(
-				this.state.timeRemaining + TIME_CONFIG.bonusPerPass,
-				TIME_CONFIG.maxTime
-			);
+			this.thresholdBonusGiven = false; // Reset for next threshold
 			this.state.submittedWords = [];
 			this.state.currentWord = "";
 
@@ -231,6 +239,7 @@ class GameManager {
 		this.state.timeRemaining = TIME_CONFIG.startingTime;
 		this.state.submittedWords = [];
 		this.state.currentWord = "";
+		this.thresholdBonusGiven = false;
 
 		// Full reshuffle for new possession
 		const newLetters = generateLetterSet();

@@ -1,38 +1,46 @@
 import { FIBONACCI_SCORES } from "@shared/types";
 
-export function getWordScore(word: string): number {
+export function getWordScore(word: string, centerLetter: string): number {
 	const length = word.length;
 	if (length < 3) return 0;
+
+	let baseScore: number;
 	if (length in FIBONACCI_SCORES) {
-		return FIBONACCI_SCORES[length];
+		baseScore = FIBONACCI_SCORES[length];
+	} else {
+		// For words longer than 12 letters, continue Fibonacci
+		let a = 55,
+			b = 89;
+		for (let i = 12; i < length; i++) {
+			const temp = a + b;
+			a = b;
+			b = temp;
+		}
+		baseScore = b;
 	}
-	// For words longer than 12 letters, continue Fibonacci
-	let a = 55,
-		b = 89;
-	for (let i = 12; i < length; i++) {
-		const temp = a + b;
-		a = b;
-		b = temp;
-	}
-	return b;
+
+	// Double points if word contains center letter
+	const includesCenter = word.toUpperCase().includes(centerLetter.toUpperCase());
+	return includesCenter ? baseScore * 2 : baseScore;
 }
 
 export function isWordValid(
 	word: string,
-	centerLetter: string,
-	availableLetters: string[]
+	_centerLetter: string,
+	availableLetters: string[],
+	centerLetter: string
 ): boolean {
 	const upper = word.toUpperCase();
-	const center = centerLetter.toUpperCase();
 
 	// Must be at least 3 letters
 	if (upper.length < 3) return false;
 
-	// Must contain center letter
-	if (!upper.includes(center)) return false;
-
 	// All letters must be from available set (center + surrounding)
-	const available = new Set([center, ...availableLetters.map((l) => l.toUpperCase())]);
+	// Center letter is NO LONGER required
+	const available = new Set([
+		centerLetter.toUpperCase(),
+		...availableLetters.map((l) => l.toUpperCase()),
+	]);
 	for (const letter of upper) {
 		if (!available.has(letter)) return false;
 	}

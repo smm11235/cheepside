@@ -1,9 +1,18 @@
 import { Scene, GameObjects } from "phaser";
 import { gameManager } from "../systems/GameManager";
 
+interface ButtonData {
+	x: number;
+	y: number;
+	radius: number;
+	index: number; // -1 for center, 0-4 for surrounding
+	container: GameObjects.Container;
+}
+
 export class GameScene extends Scene {
-	private letterButtons: GameObjects.Container[] = [];
+	private buttons: ButtonData[] = [];
 	private centerButton!: GameObjects.Container;
+	private letterButtons: GameObjects.Container[] = [];
 
 	// Pitch elements
 	private pitchGraphics!: GameObjects.Graphics;
@@ -20,6 +29,7 @@ export class GameScene extends Scene {
 	create(): void {
 		this.createPitch();
 		this.createBallInterface();
+		this.setupInput();
 		this.setupKeyboardInput();
 		this.subscribeToGameEvents();
 
@@ -30,12 +40,48 @@ export class GameScene extends Scene {
 		gameManager.startMatch();
 	}
 
+	private setupInput(): void {
+		// Use scene-level pointer input for reliable click detection
+		this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+			const clickedButton = this.findButtonAtPosition(pointer.x, pointer.y);
+			if (clickedButton) {
+				this.handleButtonClick(clickedButton);
+			}
+		});
+	}
+
+	private findButtonAtPosition(x: number, y: number): ButtonData | null {
+		for (const button of this.buttons) {
+			const dx = x - button.x;
+			const dy = y - button.y;
+			const distance = Math.sqrt(dx * dx + dy * dy);
+			if (distance <= button.radius) {
+				return button;
+			}
+		}
+		return null;
+	}
+
+	private handleButtonClick(button: ButtonData): void {
+		const state = gameManager.getState();
+		let letter: string;
+
+		if (button.index === -1) {
+			letter = state.centerLetter;
+		} else {
+			letter = state.surroundingLetters[button.index];
+		}
+
+		if (letter) {
+			gameManager.addLetter(letter.toUpperCase());
+			this.animateButtonPress(button.container);
+		}
+	}
+
 	private handleResize(): void {
-		// Clear and recreate everything on resize
 		this.pitchGraphics.clear();
 		this.ballBg.clear();
 
-		// Recreate pitch
 		const { width, height } = this.scale;
 		const pitchHeight = height * 0.3;
 
@@ -52,12 +98,10 @@ export class GameScene extends Scene {
 		this.pitchGraphics.strokeRect(0, pitchHeight / 2 - goalHeight, goalWidth, goalHeight * 2);
 		this.pitchGraphics.strokeRect(width - goalWidth, pitchHeight / 2 - goalHeight, goalWidth, goalHeight * 2);
 
-		// Update ball marker position
 		const state = gameManager.getState();
 		const positions = [0.3, 0.45, 0.6, 0.75, 0.85];
 		this.ballPositionMarker.setPosition(width * positions[state.passIndex], pitchHeight / 2);
 
-		// Recreate ball interface background
 		const interfaceHeight = height - pitchHeight;
 		const centerY = pitchHeight + interfaceHeight * 0.4;
 		const centerX = width / 2;
@@ -69,15 +113,19 @@ export class GameScene extends Scene {
 		this.ballBg.lineStyle(3, 0x444466, 1);
 		this.ballBg.strokeCircle(centerX, centerY, ballRadius);
 
-		// Reposition buttons
+		// Update button positions
+		const centerSize = 55;
 		this.centerButton.setPosition(centerX, centerY);
+		this.buttons[0] = { x: centerX, y: centerY, radius: centerSize, index: -1, container: this.centerButton };
 
 		const hexRadius = ballRadius * 0.55;
+		const hexSize = 48;
 		for (let i = 0; i < 5; i++) {
 			const angle = (i * 72 - 90) * (Math.PI / 180);
 			const x = centerX + Math.cos(angle) * hexRadius;
 			const y = centerY + Math.sin(angle) * hexRadius;
 			this.letterButtons[i].setPosition(x, y);
+			this.buttons[i + 1] = { x, y, radius: hexSize, index: i, container: this.letterButtons[i] };
 		}
 	}
 
@@ -120,23 +168,27 @@ export class GameScene extends Scene {
 		this.ballBg.strokeCircle(centerX, centerY, ballRadius);
 
 		// Create center pentagon
-		this.centerButton = this.createLetterButton(centerX, centerY, true, -1);
+		const centerSize = 55;
+		this.centerButton = this.createLetterButton(centerX, centerY, true);
+		this.buttons.push({ x: centerX, y: centerY, radius: centerSize, index: -1, container: this.centerButton });
 
 		// Create surrounding hexagons
 		const hexRadius = ballRadius * 0.55;
+		const hexSize = 48;
 		for (let i = 0; i < 5; i++) {
 			const angle = (i * 72 - 90) * (Math.PI / 180);
 			const x = centerX + Math.cos(angle) * hexRadius;
 			const y = centerY + Math.sin(angle) * hexRadius;
 
-			const button = this.createLetterButton(x, y, false, i);
+			const button = this.createLetterButton(x, y, false);
 			this.letterButtons.push(button);
+			this.buttons.push({ x, y, radius: hexSize, index: i, container: button });
 		}
 
 		this.updateLetterDisplay();
 	}
 
-	private createLetterButton(x: number, y: number, isCenter: boolean, index: number): GameObjects.Container {
+	private createLetterButton(x: number, y: number, isCenter: boolean): GameObjects.Container {
 		const container = this.add.container(x, y);
 		const size = isCenter ? 55 : 48;
 		const sides = isCenter ? 5 : 6;
@@ -164,38 +216,12 @@ export class GameScene extends Scene {
 		text.setOrigin(0.5);
 
 		container.add([graphics, text]);
-		container.setSize(size * 2, size * 2);
-		container.setInteractive(
-			new Phaser.Geom.Rectangle(-size, -size, size * 2, size * 2),
-			Phaser.Geom.Rectangle.Contains
-		);
-
-		// Store index for click handling
-		container.setData("index", index);
 		container.setData("text", text);
-		container.setData("isCenter", isCenter);
-
-		container.on("pointerdown", () => {
-			const state = gameManager.getState();
-			let letter: string;
-
-			if (isCenter) {
-				letter = state.centerLetter;
-			} else {
-				letter = state.surroundingLetters[index];
-			}
-
-			if (letter) {
-				gameManager.addLetter(letter.toUpperCase());
-				this.animateButtonPress(container);
-			}
-		});
 
 		return container;
 	}
 
 	private setupKeyboardInput(): void {
-		// Get available letters for keyboard filtering
 		const getAvailableLetters = (): Set<string> => {
 			const state = gameManager.getState();
 			const letters = new Set<string>();
@@ -204,11 +230,9 @@ export class GameScene extends Scene {
 			return letters;
 		};
 
-		// Letter keys
 		this.input.keyboard?.on("keydown", (event: KeyboardEvent) => {
 			const key = event.key.toUpperCase();
 
-			// Check if it's a letter key
 			if (key.length === 1 && key >= "A" && key <= "Z") {
 				const available = getAvailableLetters();
 				if (available.has(key)) {
@@ -218,19 +242,16 @@ export class GameScene extends Scene {
 				return;
 			}
 
-			// Backspace/Delete to remove letter
 			if (event.key === "Backspace" || event.key === "Delete") {
 				gameManager.removeLetter();
 				return;
 			}
 
-			// Enter to submit
 			if (event.key === "Enter") {
 				gameManager.submitWord();
 				return;
 			}
 
-			// Space to pass (if threshold reached)
 			if (event.key === " ") {
 				event.preventDefault();
 				if (gameManager.canPass()) {
@@ -239,7 +260,6 @@ export class GameScene extends Scene {
 				return;
 			}
 
-			// Escape to clear
 			if (event.key === "Escape") {
 				gameManager.clearWord();
 				return;
@@ -248,7 +268,6 @@ export class GameScene extends Scene {
 	}
 
 	private flashKeyPress(letter: string): void {
-		// Find and animate the button with this letter
 		const state = gameManager.getState();
 
 		if (state.centerLetter.toUpperCase() === letter) {

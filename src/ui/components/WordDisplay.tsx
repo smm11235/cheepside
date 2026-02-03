@@ -105,7 +105,8 @@ export function WordDisplay() {
 	const handleSubmit = () => {
 		const result = gameManager.submitWord();
 		if (result.success) {
-			setFeedback({ message: `+${result.score} points!`, isError: false });
+			const bonusText = result.hasBonus ? " (2x!)" : "";
+			setFeedback({ message: `+${result.score} points${bonusText}`, isError: false });
 		} else {
 			setFeedback({ message: result.reason || "Invalid", isError: true });
 		}
